@@ -1,0 +1,5 @@
+npm install zod
+---Estetica
+npm install lucide-react
+--Controla el movimiento de datos
+npm install react-hook-form @hookform/resolvers 
