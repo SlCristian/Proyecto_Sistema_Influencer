@@ -1,7 +1,8 @@
 "use client";
-import { Mail, Eye, MoreVertical, CalendarDays, CheckCircle2, XCircle, FileInput, FileOutput, BotMessageSquare, Search, ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import { Mail, Eye, MoreVertical, CalendarDays, CheckCircle2, XCircle, FileInput, FileOutput, BotMessageSquare, Search, ChevronLeft, ChevronRight, Filter,Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Influencer, InfluencerStatus } from "../types";
+import InfluencerModal from "./influencer-modal";
 
 // Datos de prueba basados en tu imagen
 const mockInfluencers: Influencer[] = [
@@ -55,6 +56,30 @@ const ScoreIA = ({ score }: { score: number }) => {
 
 export function InfluencerTable() {
   const [selectedInfluencers, setSelectedInfluencers] = useState<string[]>([]);
+
+const [isModalOpen, setIsModalOpen] = useState(false);
+const [influencerToEdit, setInfluencerToEdit] = useState<Influencer | null>(null);
+
+const handleEditClick = (influencer: Influencer) => {
+  setInfluencerToEdit(influencer);
+  setIsModalOpen(true);
+};
+
+const handleDeleteClick = (id: string) => {
+  if (confirm("¿Estás seguro de que deseas eliminar este influencer?")) {
+    console.log("Eliminando influencer:", id);
+    // Aquí iría la lógica para borrar
+  }
+};
+
+
+
+
+
+
+
+
+
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -159,8 +184,15 @@ export function InfluencerTable() {
                                 </button>
                             </div>
                         )}
-                        <button className="p-1.5 hover:bg-gray-100 hover:text-gray-800 rounded-md transition-colors">
-                            <MoreVertical size={16}/>
+                        <button className="p-1.5 hover:bg-gray-100 hover:text-gray-800 rounded-md transition-colors" 
+                        onClick={()=>handleEditClick(inf)}
+                        >
+                            <Pencil size={16}/>
+                        </button>
+                        <button className="p-1.5 hover:bg-gray-100 hover:text-gray-800 rounded-md transition-colors"
+                        onClick={()=>handleDeleteClick(inf.id)}
+                        >
+                            <Trash2 size={16}/>
                         </button>
                     </div>
                 </td>
@@ -169,6 +201,15 @@ export function InfluencerTable() {
           </tbody>
         </table>
       </div>
+
+{/*Modal */}
+{/* RENDERIZAMOS EL MODAL AL FINAL Y PASAMOS LAS PROPS */}
+      <InfluencerModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        influencer={influencerToEdit} 
+      />
+
 
       {/* Paginación */}
       <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-600">
