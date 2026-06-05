@@ -1,0 +1,12 @@
+npm install prisma@6.2.1 --save-dev
+npm install @prisma/client@6.2.1
+--Crea una carpeta llamada prisma y el .env
+npx prisma init
+-- Validaciones --
+npm install class-validator class-transformer
+-- Manejar la seguridad(encriptar contraseñas) y los tokens. JWT -- 
+npm i @nestjs/jwt @nestjs/passport passport passport-jwt bcrypt
+npm i -D @types/bcrypt @types/passport-jwt
+
+--manejar los env--
+npm i @nestjs/config

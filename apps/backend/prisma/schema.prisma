@@ -1,0 +1,199 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+//Estado del usuario
+enum EstadoUsuario{
+  ACTIVO
+  INACTIVO
+}
+model Role {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique // Ej: "ADMIN", "VOLUNTARIO"
+  
+  // Relación: Un rol puede pertenecer a muchos usuarios
+  usuarios  Usuario[] 
+}
+
+model Usuario {
+  id            String            @id @default(uuid())
+  email         String            @unique             
+  password      String                                
+  nombre        String
+  foto          String?                               
+  estado        EstadoUsuario     @default(ACTIVO)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  // Relación con la tabla Role
+  roleId        Int  
+  role          Role              @relation(fields: [roleId], references: [id])     
+
+  // Relaciones inversas (Un usuario tiene muchos de estos registros)
+  horarios      HorarioVoluntario[]
+  consultasIA   ConsultaIA[]
+  disponibilidades DisponibilidadCita[]
+  // Esta lleva nombre porque en Influencer especificamos "VoluntarioValidador"
+  validados     Influencer[]      @relation("VoluntarioValidador")
+}
+
+
+// Definimos los estados posibles de una consulta a la IA
+enum EstadoConsulta {
+  PROCESANDO
+  COMPLETADO
+  ERROR
+}
+
+// La plantilla o temática (Ej: Fitness, Maquillaje, Tecnología)
+model Plantilla {
+  id          String       @id @default(uuid())
+  nombre      String       @unique // Ej: "Moda Verano", "Gaming"
+  descripcion String?
+  asunto String
+  //cuerpo
+  cuerpo String
+  createdAt   DateTime     @default(now())
+  // Relación: Una plantilla puede estar en muchas consultas de IA
+  consultas   ConsultaIA[]
+}
+
+// El "Panel de la IA" -> Registro de cada prompt/búsqueda ejecutada
+model ConsultaIA {
+  id                 String         @id @default(uuid())
+  descripcionPrompt  String         // El texto del prompt que se le mandó a Gemini
+  cantidadSolicitada Int            // Cuántos influencers pidió buscar (Ej: 20)
+  rangoSeguidores    String         // Ej: "10k - 50k"
+  estado             EstadoConsulta @default(PROCESANDO)
+  fecha              DateTime       @default(now())
+
+  // Relación con el Voluntario que hizo la consulta
+  voluntarioId       String
+  voluntario         Usuario        @relation(fields: [voluntarioId], references: [id])
+
+  // Relación con la Plantilla/Temática
+  plantillaId        String
+  plantilla          Plantilla      @relation(fields: [plantillaId], references: [id])
+
+  // Relación: Una consulta de la IA genera muchos registros de influencers
+  influencers        Influencer[]
+}
+
+enum EstadoValidacion {
+  PENDIENTE    // Recién traído por la IA, nadie lo ha revisado
+  VALIDADO     // El voluntario confirmó que los datos son reales
+  RECHAZADO    // Datos falsos (se queda aquí para que el admin lo revise/borre)
+}
+
+enum EstadoContacto {
+  SIN_CONTACTAR
+  CORREO_ENVIADO
+  FORMULARIO_LLENADO
+  REUNION_AGENDADA
+  RECHAZO_CONTACTO
+}
+
+model Influencer {
+  id                 String           @id @default(uuid())
+  nombre             String
+  usuarioIg          String           // @usuario
+  linkIg             String
+  email              String?          // Opcional, a veces la IA no lo encuentra a la primera
+  phone              String?          // Opcional
+
+  // Datos entregados por la IA vs Datos Reales validados por el humano
+  seguidoresGemini   Int
+  seguidoresReales   Int?             // Se llena cuando el voluntario valida
+  likesGemini        Int
+  likesReales        Int?             // Se llena cuando el voluntario valida
+
+  // Estados del flujo
+  estadoValidacion   EstadoValidacion @default(PENDIENTE)
+  estadoContacto     EstadoContacto   @default(SIN_CONTACTAR)
+  createdAt          DateTime         @default(now())
+
+  // Relación con la Consulta IA de la que nació
+  consultaIaId       String
+  consultaIa         ConsultaIA       @relation(fields: [consultaIaId], references: [id])
+
+  // Relación con el Voluntario que hizo la VALIDACIÓN (puede ser diferente al que buscó)
+  validadoPorId      String?
+  validadoPor        Usuario?         @relation("VoluntarioValidador", fields: [validadoPorId], references: [id])
+
+  // Relaciones futuras
+  reuniones          Reunion[]
+}
+
+// Días de la semana para el horario del voluntario
+enum DiaSemana {
+  LUNES
+  MARTES
+  MIERCOLES
+  JUEVES
+  VIERNES
+  SABADO
+  DOMINGO
+}
+
+enum EstadoReunion {
+  PENDIENTE
+  REALIZADA
+  CANCELADA
+  NO_ASISTIO
+}
+
+// 1. El horario teórico/general
+model HorarioVoluntario {
+  id           String    @id @default(uuid())
+  diaSemana    DiaSemana 
+  horaInicio   String    // "08:00"
+  horaFin      String    // "13:00"
+  
+  voluntarioId String
+  voluntario   Usuario   @relation(fields: [voluntarioId], references: [id], onDelete: Cascade)
+
+  @@unique([voluntarioId, diaSemana, horaInicio, horaFin])
+}
+
+// 2. Los bloques reales de 20 min en el calendario (CORREGIDO)
+model DisponibilidadCita {
+  id           String   @id @default(uuid())
+  fechaHora    DateTime // Fecha y hora exacta (Ej: 2026-06-15T08:00:00Z)
+  disponible   Boolean  @default(true) 
+
+  // Relación directa corregida con el Voluntario
+  voluntarioId String
+  voluntario   Usuario  @relation(fields: [voluntarioId], references: [id], onDelete: Cascade)
+
+  // Relación inversa para saber qué reunión ocupó este bloque (opcional)
+  reunion      Reunion? 
+}
+
+// 3. La reunión final agendada por el influencer (ADAPTADO A GOOGLE MEET)
+model Reunion {
+  id                   String             @id @default(uuid())
+  fechaHora            DateTime      
+  duracionMinutos      Int                @default(20) 
+  estado               EstadoReunion      @default(PENDIENTE)
+  
+  // Integración con Google Meet (Esencial para que el voluntario lo vea en su panel)
+  googleMeetLink       String?            // Aquí NestJS guardará el link generado automáticamente
+  googleCalendarEventId String?           // ID del evento en Google por si necesitas cancelarlo o moverlo
+  
+  // Relaciones
+  influencerId         String
+  influencer           Influencer         @relation(fields: [influencerId], references: [id])
+  
+  // El bloque de 20 minutos que se rellenó
+  disponibilidadCitaId String             @unique
+  disponibilidadCita   DisponibilidadCita @relation(fields: [disponibilidadCitaId], references: [id])
+
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
